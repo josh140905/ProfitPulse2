@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: products
+    // Fields: name (string), price (number), costPrice (number), stock (number), userId (string)
+    //
+    // Collection: customers
+    // Fields: name (string), phone (string), email (string), address (string), userId (string), createdAt (timestamp)
+    //
+    // Collection: invoices
+    // Fields: customerName (string), customerPhone (string), customerId (string), items (list), totalAmount (number), totalCost (number), profit (number), date (string), userId (string), createdAt (timestamp)
+    //
+    // Collection: expenses
+    // Fields: description (string), amount (number), category (string), date (string), userId (string), createdAt (timestamp)
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "joshlike2get@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.price is number && data.price >= 0 &&
+             data.costPrice is number && data.costPrice >= 0 &&
+             data.stock is number &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidCustomer(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.userId == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidInvoice(data) {
+      return data.customerName is string && data.customerName.size() > 0 &&
+             data.customerPhone is string &&
+             data.customerId is string &&
+             data.items is list &&
+             data.totalAmount is number &&
+             data.totalCost is number &&
+             data.profit is number &&
+             data.date is string && data.date.size() == 10 &&
+             data.userId == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidExpense(data) {
+      return data.description is string && data.description.size() > 0 &&
+             data.amount is number && data.amount >= 0 &&
+             data.date is string && data.date.size() == 10 &&
+             data.userId == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidProfile(data) {
+      return data.businessName is string && data.businessName.size() > 0 &&
+             data.userId == request.auth.uid;
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidProduct(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /customers/{customerId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidCustomer(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidCustomer(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidInvoice(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidInvoice(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidExpense(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /profiles/{profileId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || profileId == request.auth.uid || isAdmin());
+      allow write: if isOwner(profileId) && isValidProfile(request.resource.data);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
